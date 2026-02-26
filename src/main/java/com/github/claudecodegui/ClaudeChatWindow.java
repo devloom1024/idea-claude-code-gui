@@ -319,13 +319,15 @@ public class ClaudeChatWindow {
         session.setCallback(sessionCallbackAdapter);
     }
 
-    private void onStreamEnded(boolean completed) {
-        if (!completed || session == null) {
+    private void onStreamEnded() {
+        if (session == null) {
             return;
         }
         // Claude stream_end is emitted at actual streaming completion;
         // use it as the success sound trigger point.
-        if ("claude".equals(session.getProvider())) {
+        // Only trigger success when the session has no error state,
+        // to avoid conflicting with the error notification from SessionHandler.exceptionally().
+        if ("claude".equals(session.getProvider()) && session.getError() == null) {
             com.github.claudecodegui.notifications.ClaudeNotifier.showSuccess(project, "Task completed");
         }
     }

@@ -10,7 +10,6 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 
 import java.util.List;
 import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 
 /**
  * Named implementation of ClaudeSession.SessionCallback.
@@ -32,14 +31,14 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
     private final JsTarget jsTarget;
     private final PermissionHandler permissionHandler;
     private final BooleanSupplier slashCommandsFetchedSupplier;
-    private final Consumer<Boolean> streamEndCallback;
+    private final Runnable streamEndCallback;
 
     public SessionCallbackAdapter(
             StreamMessageCoalescer streamCoalescer,
             JsTarget jsTarget,
             PermissionHandler permissionHandler,
             BooleanSupplier slashCommandsFetchedSupplier,
-            Consumer<Boolean> streamEndCallback
+            Runnable streamEndCallback
     ) {
         this.streamCoalescer = streamCoalescer;
         this.jsTarget = jsTarget;
@@ -151,7 +150,7 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
             jsTarget.callJavaScript("onStreamEnd");
             jsTarget.callJavaScript("showLoading", "false");
             if (streamEndCallback != null) {
-                streamEndCallback.accept(true);
+                streamEndCallback.run();
             }
             LOG.debug("Stream ended - notified frontend with onStreamEnd then loading=false");
         });

@@ -244,19 +244,37 @@ public class SoundNotificationService {
     }
 
     /**
-     * 使用 JLayer 播放 MP3（后台线程调用，阻塞直到当前音频播放结束）。
+     * Max playback time for MP3 files (seconds).
+     * Prevents a corrupted/oversized file from blocking the pooled thread indefinitely.
+     */
+    private static final int MP3_PLAYBACK_TIMEOUT_SECONDS = 30;
+
+    /**
+     * 使用 JLayer 播放 MP3（后台线程调用，阻塞直到播放结束或超时）。
      */
     private void playMp3(File file) throws Exception {
-        Player player = null;
         try (BufferedInputStream bufferedStream = new BufferedInputStream(new FileInputStream(file))) {
-            player = new Player(bufferedStream);
-            player.play();
-        } catch (JavaLayerException e) {
-            throw new Exception("Failed to decode MP3: " + e.getMessage(), e);
-        } finally {
-            if (player != null) {
+            Player player = new Player(bufferedStream);
+            CountDownLatch latch = new CountDownLatch(1);
+
+            Thread playThread = new Thread(() -> {
+                try {
+                    player.play();
+                } catch (JavaLayerException e) {
+                    LOG.warn("[SoundNotification] MP3 playback error: " + e.getMessage());
+                } finally {
+                    latch.countDown();
+                }
+            }, "SoundNotification-MP3");
+            playThread.setDaemon(true);
+            playThread.start();
+
+            if (!latch.await(MP3_PLAYBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                LOG.warn("[SoundNotification] MP3 playback timed out after " + MP3_PLAYBACK_TIMEOUT_SECONDS + "s");
                 player.close();
             }
+        } catch (JavaLayerException e) {
+            throw new Exception("Failed to decode MP3: " + e.getMessage(), e);
         }
     }
 
