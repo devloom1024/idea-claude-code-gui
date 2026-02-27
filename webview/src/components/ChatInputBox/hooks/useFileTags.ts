@@ -13,6 +13,12 @@ import {
 } from '../utils/virtualCursorUtils.js';
 import type { FileTagInfo } from '../types.js';
 
+interface FileMatch {
+  index: number;
+  path: string;
+  fullMatch: string;
+}
+
 interface UseFileTagsOptions {
   editableRef: React.RefObject<HTMLDivElement | null>;
   getTextContent: () => string;
@@ -95,12 +101,6 @@ export function useFileTags({
     const timer = perfTimer('renderFileTags');
     if (!editableRef.current) return;
 
-    // Regex: match @filepath (ending with space or string end)
-    // Supports files and directories: extension is optional
-    // Supports Windows paths (backslash) and Unix paths (forward slash)
-    // Matches all characters except space and @ (including backslash, forward slash, colon, etc.)
-    const fileRefRegex = /@([^\s@]+?)(\s|$)/g;
-
     const currentText = getTextContent();
     timer.mark('getText');
 
@@ -118,8 +118,74 @@ export function useFileTags({
       return;
     }
 
-    const matches = Array.from(currentText.matchAll(fileRefRegex));
-    timer.mark('regex');
+    /**
+     * Smart file reference matching that supports filenames with spaces.
+     *
+     * Strategy:
+     * 1. Find all @ positions in the text
+     * 2. For each @, try to match against known paths in pathMappingRef
+     * 3. Choose the longest matching path to handle filenames with spaces correctly
+     * 4. Fall back to simple regex matching for paths not in pathMappingRef
+     *
+     * Performance: O(N * M * L) where N = number of '@' in text, M = pathMapping size,
+     * L = average path length (for startsWith checks). Acceptable for input box text
+     * (typically < 10 '@' references) and moderate project sizes (< 1000 path entries).
+     */
+    const matches: FileMatch[] = [];
+
+    // First pass: Find @ positions and try to match against pathMappingRef
+    for (let i = 0; i < currentText.length; i++) {
+      if (currentText[i] === '@') {
+        let longestMatch: { path: string; length: number } | null = null;
+
+        // Try to find the longest matching path from pathMappingRef
+        // Uses startsWith(str, position) to avoid creating substrings
+        for (const [key] of pathMappingRef.current) {
+          // Check if the text at position i matches "@key"
+          if (currentText.startsWith(key, i + 1)) {
+            // Match must be followed by whitespace or end of string
+            const afterChar = currentText[i + 1 + key.length];
+            if (afterChar === undefined || afterChar === ' ' || afterChar === '\n' || afterChar === '\t' || afterChar === '\r') {
+              if (!longestMatch || key.length > longestMatch.length) {
+                longestMatch = { path: key, length: key.length };
+              }
+            }
+          }
+        }
+
+        if (longestMatch) {
+          // Found a match from pathMappingRef
+          const afterChar = currentText[i + 1 + longestMatch.length];
+          const spacer = afterChar === ' ' ? ' ' : '';
+          matches.push({
+            index: i,
+            path: longestMatch.path,
+            fullMatch: '@' + longestMatch.path + spacer,
+          });
+          // Skip past this match
+          i += longestMatch.length;
+          continue;
+        }
+
+        // Fall back to simple pattern matching for paths not in pathMappingRef
+        // This handles absolute paths and paths with line numbers
+        // Match pattern: @[non-space-non-@-chars](space|newline|end)
+        const remainingText = currentText.substring(i);
+        const simpleMatch = remainingText.match(/^@([^\s@]+?)(\s|$)/);
+
+        if (simpleMatch) {
+          matches.push({
+            index: i,
+            path: simpleMatch[1],
+            fullMatch: simpleMatch[0],
+          });
+          // Skip past this match (minus 1 because the loop will increment i)
+          i += simpleMatch[0].length - 1;
+        }
+      }
+    }
+
+    timer.mark('smart-matching');
 
     if (matches.length === 0) {
       // No file references, keep as is
@@ -166,9 +232,9 @@ export function useFileTags({
     let lastIndex = 0;
 
     limitedMatches.forEach((match) => {
-      const fullMatch = match[0];
-      const filePath = match[1];
-      const matchIndex = match.index || 0;
+      const fullMatch = match.fullMatch;
+      const filePath = match.path;
+      const matchIndex = match.index;
 
       // Add text before match
       if (matchIndex > lastIndex) {

@@ -31,17 +31,20 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
     private final JsTarget jsTarget;
     private final PermissionHandler permissionHandler;
     private final BooleanSupplier slashCommandsFetchedSupplier;
+    private final Runnable streamEndCallback;
 
     public SessionCallbackAdapter(
             StreamMessageCoalescer streamCoalescer,
             JsTarget jsTarget,
             PermissionHandler permissionHandler,
-            BooleanSupplier slashCommandsFetchedSupplier
+            BooleanSupplier slashCommandsFetchedSupplier,
+            Runnable streamEndCallback
     ) {
         this.streamCoalescer = streamCoalescer;
         this.jsTarget = jsTarget;
         this.permissionHandler = permissionHandler;
         this.slashCommandsFetchedSupplier = slashCommandsFetchedSupplier;
+        this.streamEndCallback = streamEndCallback;
     }
 
     @Override
@@ -146,6 +149,9 @@ public class SessionCallbackAdapter implements ClaudeSession.SessionCallback {
         ApplicationManager.getApplication().invokeLater(() -> {
             jsTarget.callJavaScript("onStreamEnd");
             jsTarget.callJavaScript("showLoading", "false");
+            if (streamEndCallback != null) {
+                streamEndCallback.run();
+            }
             LOG.debug("Stream ended - notified frontend with onStreamEnd then loading=false");
         });
         streamCoalescer.flush(null);

@@ -7,6 +7,7 @@
  *
  * Centralizes prompt management for easier maintenance and modification.
  */
+import { getWindowsPathConstraint } from '../utils/prompt-utils.js';
 
 /**
  * Build the IDE context system prompt.
@@ -41,14 +42,7 @@ function buildIDEContextPrompt(openedFiles, agentPrompt = null) {
     console.log('[Agent] ✗ buildIDEContextPrompt: No agent prompt provided');
   }
 
-  // Windows path format constraint (important technical workaround) - always include this constraint
-  prompt += '\n\n## CRITICAL: File Path Format Requirement\n\n';
-  prompt += '**IMPORTANT**: There\'s a file modification bug in Claude Code. The workaround is: always use complete absolute Windows paths with drive letters and backslashes for ALL file operations. Apply this rule going forward, not just for this file.\n\n';
-  prompt += '**Examples**:\n';
-  prompt += '- ✅ Correct: `C:\\Users\\username\\project\\src\\file.js`\n';
-  prompt += '- ❌ Wrong: `/c/Users/username/project/src/file.js`\n';
-  prompt += '- ❌ Wrong: `./src/file.js` (relative paths)\n\n';
-  prompt += '---\n\n';
+  prompt += getWindowsPathConstraint({ extra: 'Apply this rule going forward, not just for this file.' });
 
   if (!openedFiles || typeof openedFiles !== 'object') {
     // If there's only an agent prompt with no IDE context, still return the agent prompt

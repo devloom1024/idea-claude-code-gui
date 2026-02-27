@@ -851,6 +851,8 @@ public class ClaudeSession {
             LOG.warn("[Streaming] Failed to read streaming config: " + e.getMessage());
         }
 
+        final String previousSessionId = state.getSessionId();
+
         return claudeSDKBridge.sendMessage(
             channelId,
             input,
@@ -875,6 +877,16 @@ public class ClaudeSession {
                 }
                 updateUserMessageUuids();
             });
+        }).whenComplete((unused, throwable) -> {
+            if (throwable == null
+                    && (previousSessionId == null || previousSessionId.isEmpty())
+                    && state.getSessionId() != null && !state.getSessionId().isEmpty()) {
+                // Refill anonymous warm runtime after first turn captures a session ID,
+                // so the next new chat can also hit a pre-warmed path.
+                // NOTE: Idle anonymous runtimes are cleaned up by persistent-query-service's
+                // cleanupStaleAnonymousRuntimes() (ANONYMOUS_RUNTIME_MAX_IDLE_MS = 10min).
+                claudeSDKBridge.prewarmDaemonAsync(state.getCwd());
+            }
         });
     }
 

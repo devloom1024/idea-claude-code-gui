@@ -176,6 +176,9 @@ public class WebviewInitializer {
             }
         }
 
+        // Prewarm daemon in background so first user message starts faster.
+        claudeSDKBridge.prewarmDaemonAsync(host.getProject().getBasePath());
+
         // Check JCEF support before creating browser
         if (!JBCefBrowserFactory.isJcefSupported()) {
             LOG.warn("JCEF is not supported in this environment");

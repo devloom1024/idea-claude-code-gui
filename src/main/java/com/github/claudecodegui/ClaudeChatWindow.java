@@ -313,9 +313,23 @@ public class ClaudeChatWindow {
             streamCoalescer,
             this::callJavaScript,
             permissionHandler,
-            () -> slashCommandsFetched
+            () -> slashCommandsFetched,
+            this::onStreamEnded
         );
         session.setCallback(sessionCallbackAdapter);
+    }
+
+    private void onStreamEnded() {
+        if (session == null) {
+            return;
+        }
+        // Claude stream_end is emitted at actual streaming completion;
+        // use it as the success sound trigger point.
+        // Only trigger success when the session has no error state,
+        // to avoid conflicting with the error notification from SessionHandler.exceptionally().
+        if ("claude".equals(session.getProvider()) && session.getError() == null) {
+            com.github.claudecodegui.notifications.ClaudeNotifier.showSuccess(project, "Task completed");
+        }
     }
 
     private void initializeSessionInfo() {

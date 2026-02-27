@@ -60,7 +60,7 @@ import { getMcpServersStatus, loadMcpServersConfig, getMcpServerTools as getMcpS
 
 import { setupApiKey, isCustomBaseUrl, loadClaudeSettings } from '../../config/api-config.js';
 import { selectWorkingDirectory, getRealHomeDir, getClaudeDir } from '../../utils/path-utils.js';
-import { mapModelIdToSdkName, setModelEnvironmentVariables } from '../../utils/model-utils.js';
+import { mapModelIdToSdkName, setModelEnvironmentVariables, resolveModelFromSettings } from '../../utils/model-utils.js';
 import { AsyncStream } from '../../utils/async-stream.js';
 import { canUseTool, requestPlanApproval } from '../../permission-handler.js';
 import { persistJsonlMessage, loadSessionHistory } from './session-service.js';
@@ -592,10 +592,17 @@ export async function sendMessage(message, resumeSessionId = null, cwd = null, p
     const sdkModelName = mapModelIdToSdkName(model);
     console.log('[DEBUG] Model mapping:', model, '->', sdkModelName);
 
-    // FIX: Set model environment variables so the SDK knows which specific version to use.
-    // For example, when the user selects claude-opus-4-6, we need to set ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6.
-    // Otherwise the SDK only knows to use 'opus' but doesn't know whether it's 4.5 or 4.6.
-    setModelEnvironmentVariables(model);
+    // Load settings once for model resolution, thinking config, and streaming config
+    const settings = loadClaudeSettings();
+
+    // FIX: Resolve the actual model name for API calls.
+    // When the user configures a model mapping in their provider config (e.g. sonnet -> "MiniMax-M2.5"),
+    // the mapped name is written to ~/.claude/settings.json as ANTHROPIC_DEFAULT_*_MODEL.
+    // We must use that mapped name (not the internal ID like 'claude-sonnet-4-6') when calling the API,
+    // otherwise third-party API proxies that don't recognize internal IDs will return 400 errors.
+    const resolvedModel = resolveModelFromSettings(model, settings?.env);
+    console.log('[DEBUG] Model resolved for API:', model, '->', resolvedModel);
+    setModelEnvironmentVariables(resolvedModel, model);
 
 	    // Build systemPrompt.append content (for adding opened files context and agent prompt)
 	    // Use the unified prompt management module to build IDE context prompt (including agent prompt)
@@ -619,8 +626,7 @@ export async function sendMessage(message, resumeSessionId = null, cwd = null, p
 	    console.log('[PERM_DEBUG] shouldUseCanUseTool:', shouldUseCanUseTool);
 	    console.log('[PERM_DEBUG] canUseTool function defined:', typeof canUseTool);
 
-    // Read Extended Thinking configuration from settings.json
-    const settings = loadClaudeSettings();
+    // Read Extended Thinking configuration from settings.json (reuse `settings` loaded above)
     const alwaysThinkingEnabled = settings?.alwaysThinkingEnabled ?? true;
     const configuredMaxThinkingTokens = settings?.maxThinkingTokens
       || parseInt(process.env.MAX_THINKING_TOKENS || '0', 10)
@@ -1067,7 +1073,14 @@ export async function sendMessageWithAnthropicSDK(message, resumeSessionId, cwd,
     try { process.chdir(workingDirectory); } catch {}
 
     const sessionId = (resumeSessionId && resumeSessionId !== '') ? resumeSessionId : randomUUID();
-    const modelId = model || 'claude-sonnet-4-5';
+    const rawModelId = model || 'claude-sonnet-4-5';
+
+    // FIX: Resolve the actual model name from settings.json model mapping.
+    // When using third-party API proxies, the internal model ID (e.g. 'claude-sonnet-4-6')
+    // may not be recognized. Use the user's configured model mapping if available.
+    const sdkSettings = loadClaudeSettings();
+    const modelId = resolveModelFromSettings(rawModelId, sdkSettings?.env);
+    console.log('[DEBUG] (AnthropicSDK) Model resolved for API:', rawModelId, '->', modelId);
 
     // Use the correct SDK parameters based on auth type
     // authType = 'auth_token': use authToken parameter (Bearer authentication)
@@ -1320,8 +1333,14 @@ export async function sendMessageWithAttachments(message, resumeSessionId = null
     };
 
     const sdkModelName = mapModelIdToSdkName(model);
-    // FIX: Set model environment variables so the SDK knows which specific version to use
-    setModelEnvironmentVariables(model);
+
+    // Load settings once for model resolution, thinking config, and streaming config
+    const settings = loadClaudeSettings();
+
+    // FIX: Resolve the actual model name from settings.json model mapping for third-party API proxies
+    const resolvedAttachModel = resolveModelFromSettings(model, settings?.env);
+    console.log('[DEBUG] (withAttachments) Model resolved for API:', model, '->', resolvedAttachModel);
+    setModelEnvironmentVariables(resolvedAttachModel, model);
     // No longer searching for system CLI; using SDK's built-in cli.js
     console.log('[DEBUG] (withAttachments) Using SDK built-in Claude CLI (cli.js)');
 
@@ -1340,8 +1359,7 @@ export async function sendMessageWithAttachments(message, resumeSessionId = null
     // Note: Per SDK docs, if no matcher is specified, the hook matches all tools.
     // We use a single global PreToolUse hook and let its internal logic decide which tools to auto-approve.
 
-    // Read Extended Thinking configuration from settings.json
-    const settings = loadClaudeSettings();
+    // Read Extended Thinking configuration from settings.json (reuse `settings` loaded above)
     const alwaysThinkingEnabled = settings?.alwaysThinkingEnabled ?? true;
     const configuredMaxThinkingTokens = settings?.maxThinkingTokens
       || parseInt(process.env.MAX_THINKING_TOKENS || '0', 10)
@@ -2237,4 +2255,15 @@ export function removeSession(sessionId) {
     return true;
   }
   return false;
+}
+
+/**
+ * Register an active query object for a session (used by persistent daemon runtime).
+ * @param {string} sessionId
+ * @param {object} queryResult
+ */
+export function registerActiveQueryResult(sessionId, queryResult) {
+  if (!sessionId || !queryResult || !activeQueryResults) return false;
+  activeQueryResults.set(sessionId, queryResult);
+  return true;
 }

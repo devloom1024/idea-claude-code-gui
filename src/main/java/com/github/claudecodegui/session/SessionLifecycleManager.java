@@ -99,6 +99,7 @@ public class SessionLifecycleManager {
             String workingDirectory = determineWorkingDirectory();
             newSession.setSessionInfo(null, workingDirectory);
             LOG.info("New session created successfully, working directory: " + workingDirectory);
+            host.getClaudeSDKBridge().prewarmDaemonAsync(workingDirectory);
 
             ApplicationManager.getApplication().invokeLater(() -> {
                 host.callJavaScript("updateStatus",
