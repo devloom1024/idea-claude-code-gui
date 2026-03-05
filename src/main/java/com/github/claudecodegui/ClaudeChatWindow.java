@@ -441,11 +441,6 @@ public class ClaudeChatWindow {
                     public void callJavaScript(String functionName, String... args) {
                         ClaudeChatWindow.this.callJavaScript(functionName, args);
                     }
-
-                    @Override
-                    public void executeJavaScriptCode(String jsCode) {
-                        ClaudeChatWindow.this.executeJavaScriptCode(jsCode);
-                    }
                 },
                 permissionHandler,
                 () -> slashCommandsFetched,

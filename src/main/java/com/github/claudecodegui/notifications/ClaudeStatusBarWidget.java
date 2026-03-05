@@ -12,6 +12,8 @@ import com.intellij.openapi.wm.WindowManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import com.intellij.openapi.application.ApplicationManager;
+
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -229,6 +231,15 @@ public class ClaudeStatusBarWidget implements CustomStatusBarWidget, StatusBarWi
         if (disposed) return;
         textRef.set(text);
         tooltipRef.set(tooltip);
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            updateLabelOnEdt(text, tooltip);
+        } else {
+            ApplicationManager.getApplication().invokeLater(() -> updateLabelOnEdt(text, tooltip));
+        }
+    }
+
+    private void updateLabelOnEdt(String text, String tooltip) {
+        if (disposed) return;
         if (label != null) {
             label.setText(text);
             label.setToolTipText(tooltip);

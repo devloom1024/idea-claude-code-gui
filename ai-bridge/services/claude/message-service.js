@@ -551,6 +551,7 @@ export async function sendMessage(message, resumeSessionId = null, cwd = null, p
   let streamingEnabled = false;
   let streamStarted = false;
   let streamEnded = false;
+  let accumulatedUsage = null;
   try {
     process.env.CLAUDE_CODE_ENTRYPOINT = process.env.CLAUDE_CODE_ENTRYPOINT || 'sdk-ts';
     console.log('[DEBUG] CLAUDE_CODE_ENTRYPOINT:', process.env.CLAUDE_CODE_ENTRYPOINT);
@@ -1310,6 +1311,7 @@ export async function sendMessageWithAttachments(message, resumeSessionId = null
   let streamingEnabled = false;
   let streamStarted = false;
   let streamEnded = false;
+  let accumulatedUsage = null;
   try {
     process.env.CLAUDE_CODE_ENTRYPOINT = process.env.CLAUDE_CODE_ENTRYPOINT || 'sdk-ts';
 

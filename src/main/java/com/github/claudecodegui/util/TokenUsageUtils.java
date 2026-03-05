@@ -20,7 +20,7 @@ public final class TokenUsageUtils {
      * Formula: input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens
      * This matches CLI's status bar display which shows total tokens used (not just context window).
      */
-    public static int calculateContextWindowTokens(int inputTokens, int cacheCreationTokens, int cacheReadTokens, int outputTokens) {
+    public static int calculateTotalTokens(int inputTokens, int cacheCreationTokens, int cacheReadTokens, int outputTokens) {
         return inputTokens + cacheCreationTokens + cacheReadTokens + outputTokens;
     }
 
@@ -38,7 +38,7 @@ public final class TokenUsageUtils {
         }
         int cacheCreation = usage.has("cache_creation_input_tokens") ? usage.get("cache_creation_input_tokens").getAsInt() : 0;
         int cacheRead = usage.has("cache_read_input_tokens") ? usage.get("cache_read_input_tokens").getAsInt() : 0;
-        return calculateContextWindowTokens(input, cacheCreation, cacheRead, output);
+        return calculateTotalTokens(input, cacheCreation, cacheRead, output);
     }
 
     /**

@@ -112,7 +112,7 @@ public class ClaudeMessageHandler implements MessageCallback {
                 handleMessageEnd();
                 break;
             case "result":
-                handleResult();
+                handleResult(content);
                 break;
             case "usage":
                 handleUsage(content);
@@ -239,9 +239,10 @@ public class ClaudeMessageHandler implements MessageCallback {
                 LOG.debug("Streaming active, skipping full message update in handleAssistantMessage");
             }
 
-            // Update status bar with usage from the final assistant message (matches CLI's PP1 behavior)
-            // This ensures the displayed value matches what resume shows from JSONL history
-            if (mergedRaw.has("message") && mergedRaw.get("message").isJsonObject()) {
+            // Update status bar with usage from the assistant message.
+            // In streaming mode, usage is primarily updated via handleUsage() from [USAGE] tags,
+            // so skip here to avoid duplicate updates. In non-streaming mode, this is the primary path.
+            if (!isStreaming && mergedRaw.has("message") && mergedRaw.get("message").isJsonObject()) {
                 JsonObject messageObj = mergedRaw.getAsJsonObject("message");
                 if (messageObj.has("usage") && messageObj.get("usage").isJsonObject()) {
                     JsonObject usage = messageObj.getAsJsonObject("usage");
@@ -249,7 +250,7 @@ public class ClaudeMessageHandler implements MessageCallback {
                     int maxTokens = SettingsHandler.getModelContextLimit(state.getModel());
                     ClaudeNotifier.setTokenUsage(project, usedTokens, maxTokens);
                     callbackHandler.notifyUsageUpdate(usedTokens, maxTokens);
-                    LOG.debug("Updated token usage from assistant message: " + usedTokens);
+                    LOG.debug("Updated token usage from assistant message (non-streaming): " + usedTokens);
                 }
             }
         } catch (Exception e) {
@@ -449,14 +450,41 @@ public class ClaudeMessageHandler implements MessageCallback {
     }
 
     /**
-     * Handle the result message (intentionally no-op for status bar).
-     * result.usage is the cumulative total across all tool-call turns in the session
-     * (used for billing, not context window display). The status bar is correctly
-     * updated by handleUsage() from each turn's [USAGE] tag, which reflects
-     * per-turn context window usage — matching CLI's PP1() behavior.
+     * Handle the result message as a fallback for non-streaming mode.
+     * In streaming mode, usage is updated via handleUsage() from [USAGE] tags.
+     * In non-streaming mode, [USAGE] tags may not be emitted, so result.usage
+     * serves as the fallback data source to ensure token usage is displayed.
      */
-    private void handleResult() {
-        LOG.debug("Result message received");
+    private void handleResult(String content) {
+        if (content == null || !content.startsWith("{")) {
+            LOG.debug("Result message received (non-JSON, skipping)");
+            return;
+        }
+        try {
+            JsonObject resultJson = gson.fromJson(content, JsonObject.class);
+            LOG.debug("Result message received");
+            // Fallback: only update usage from result if no usage was received via [USAGE] tag or assistant message
+            if (resultJson.has("usage") && resultJson.get("usage").isJsonObject()
+                    && currentAssistantMessage != null && currentAssistantMessage.raw != null) {
+                JsonObject msg = currentAssistantMessage.raw.has("message")
+                        && currentAssistantMessage.raw.get("message").isJsonObject()
+                        ? currentAssistantMessage.raw.getAsJsonObject("message") : null;
+                boolean hasExistingUsage = msg != null && msg.has("usage") && msg.get("usage").isJsonObject();
+                if (!hasExistingUsage) {
+                    JsonObject usageJson = resultJson.getAsJsonObject("usage");
+                    if (msg != null) {
+                        msg.add("usage", usageJson);
+                    }
+                    int usedTokens = TokenUsageUtils.extractUsedTokens(usageJson, state.getProvider());
+                    int maxTokens = SettingsHandler.getModelContextLimit(state.getModel());
+                    ClaudeNotifier.setTokenUsage(project, usedTokens, maxTokens);
+                    callbackHandler.notifyUsageUpdate(usedTokens, maxTokens);
+                    LOG.debug("Fallback: updated token usage from result message: " + usedTokens);
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to parse result message: " + e.getMessage());
+        }
     }
 
     /**
@@ -646,7 +674,8 @@ public class ClaudeMessageHandler implements MessageCallback {
 
     /**
      * Backfill usage data into the current assistant message's raw JSON.
-     * Always updates during streaming to capture accumulating usage data.
+     * Uses monotonic increase check to prevent overwriting a larger value with a smaller one
+     * (e.g., due to out-of-order message delivery).
      */
     private void backfillUsageToAssistantMessage(JsonObject usageJson) {
         if (currentAssistantMessage == null || currentAssistantMessage.raw == null) return;
@@ -654,9 +683,17 @@ public class ClaudeMessageHandler implements MessageCallback {
                 ? currentAssistantMessage.raw.getAsJsonObject("message") : null;
         if (message == null) return;
 
-        // Always update usage during streaming to capture accumulating values
+        // Monotonic increase check: only update if new total >= existing total
+        int newTotal = TokenUsageUtils.extractUsedTokens(usageJson, state.getProvider());
+        if (message.has("usage") && message.get("usage").isJsonObject()) {
+            int existingTotal = TokenUsageUtils.extractUsedTokens(message.getAsJsonObject("usage"), state.getProvider());
+            if (newTotal < existingTotal) {
+                LOG.debug("Skipping usage backfill: new total " + newTotal + " < existing " + existingTotal);
+                return;
+            }
+        }
         message.add("usage", usageJson);
-        LOG.debug("Updated assistant message usage from [USAGE] tag");
+        LOG.debug("Updated assistant message usage from [USAGE] tag: " + newTotal);
     }
 
     private void applyThinkingDeltaToRaw(String delta) {
