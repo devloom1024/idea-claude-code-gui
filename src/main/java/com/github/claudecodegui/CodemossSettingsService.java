@@ -37,7 +37,7 @@ public class CodemossSettingsService {
     private final CodexMcpServerManager codexMcpServerManager;
     private final WorkingDirectoryManager workingDirectoryManager;
     private final AgentManager agentManager;
-    private final PromptManager promptManager;
+    private final AbstractPromptManager promptManager;
     private final SkillManager skillManager;
     private final McpServerManager mcpServerManager;
     private final ProviderManager providerManager;
@@ -73,8 +73,19 @@ public class CodemossSettingsService {
         // Initialize AgentManager
         this.agentManager = new AgentManager(gson, pathManager);
 
-        // Initialize PromptManager
-        this.promptManager = new PromptManager(gson, pathManager);
+        // Initialize PromptManager (will be updated to GlobalPromptManager in Task 3)
+        // TODO: Replace with concrete implementation once GlobalPromptManager is created
+        this.promptManager = new AbstractPromptManager(gson) {
+            @Override
+            protected Path getStoragePath() throws IOException {
+                return pathManager.getPromptFilePath();
+            }
+
+            @Override
+            protected void ensureStorageDirectory() throws IOException {
+                pathManager.ensureConfigDirectory();
+            }
+        };
 
         // Initialize SkillManager
         this.skillManager = new SkillManager(
@@ -629,7 +640,7 @@ public class CodemossSettingsService {
         return promptManager.getPrompt(id);
     }
 
-    public PromptManager getPromptManager() {
+    public AbstractPromptManager getPromptManager() {
         return promptManager;
     }
 

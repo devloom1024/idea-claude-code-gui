@@ -16,11 +16,12 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /**
- * Prompt Manager.
- * Manages prompt library configuration (prompt.json).
+ * Abstract Prompt Manager.
+ * Base class for managing prompt library configuration.
+ * Subclasses must implement storage path management methods to specify where prompts are stored.
  */
-public class PromptManager {
-    private static final Logger LOG = Logger.getInstance(PromptManager.class);
+public abstract class AbstractPromptManager {
+    private static final Logger LOG = Logger.getInstance(AbstractPromptManager.class);
 
     /**
      * Valid prompt ID pattern: UUID format or numeric timestamp string.
@@ -29,18 +30,28 @@ public class PromptManager {
     private static final Pattern VALID_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9\\-]{1,64}$");
 
     private final Gson gson;
-    private final ConfigPathManager pathManager;
 
-    public PromptManager(Gson gson, ConfigPathManager pathManager) {
+    public AbstractPromptManager(Gson gson) {
         this.gson = gson;
-        this.pathManager = pathManager;
     }
+
+    /**
+     * Get the storage path for prompts.
+     * Subclasses must implement this to specify their storage location.
+     */
+    protected abstract Path getStoragePath() throws IOException;
+
+    /**
+     * Ensure the storage directory exists.
+     * Subclasses must implement this to create necessary directories.
+     */
+    protected abstract void ensureStorageDirectory() throws IOException;
 
     /**
      * Read the prompt.json file.
      */
     public JsonObject readPromptConfig() throws IOException {
-        Path promptPath = pathManager.getPromptFilePath();
+        Path promptPath = getStoragePath();
 
         if (!Files.exists(promptPath)) {
             // Return an empty config
@@ -57,7 +68,7 @@ public class PromptManager {
             }
             return config;
         } catch (Exception e) {
-            LOG.warn("[PromptManager] Failed to read prompt.json: " + e.getMessage());
+            LOG.warn("[AbstractPromptManager] Failed to read prompt.json: " + e.getMessage());
             JsonObject config = new JsonObject();
             config.add("prompts", new JsonObject());
             return config;
@@ -68,14 +79,14 @@ public class PromptManager {
      * Write the prompt.json file.
      */
     public void writePromptConfig(JsonObject config) throws IOException {
-        pathManager.ensureConfigDirectory();
+        ensureStorageDirectory();
 
-        Path promptPath = pathManager.getPromptFilePath();
+        Path promptPath = getStoragePath();
         try (BufferedWriter writer = Files.newBufferedWriter(promptPath, StandardCharsets.UTF_8)) {
             gson.toJson(config, writer);
-            LOG.debug("[PromptManager] Successfully wrote prompt.json");
+            LOG.debug("[AbstractPromptManager] Successfully wrote prompt.json");
         } catch (Exception e) {
-            LOG.warn("[PromptManager] Failed to write prompt.json: " + e.getMessage());
+            LOG.warn("[AbstractPromptManager] Failed to write prompt.json: " + e.getMessage());
             throw e;
         }
     }
@@ -105,7 +116,7 @@ public class PromptManager {
             return Long.compare(timeB, timeA);
         });
 
-        LOG.debug("[PromptManager] Loaded " + result.size() + " prompts from prompt.json");
+        LOG.debug("[AbstractPromptManager] Loaded " + result.size() + " prompts from prompt.json");
         return result;
     }
 
@@ -148,7 +159,7 @@ public class PromptManager {
         prompts.add(id, prompt);
 
         writePromptConfig(config);
-        LOG.debug("[PromptManager] Added prompt: " + id);
+        LOG.debug("[AbstractPromptManager] Added prompt: " + id);
     }
 
     /**
@@ -180,7 +191,7 @@ public class PromptManager {
         }
 
         writePromptConfig(config);
-        LOG.debug("[PromptManager] Updated prompt: " + id);
+        LOG.debug("[AbstractPromptManager] Updated prompt: " + id);
     }
 
     /**
@@ -192,7 +203,7 @@ public class PromptManager {
         JsonObject prompts = config.getAsJsonObject("prompts");
 
         if (!prompts.has(id)) {
-            LOG.debug("[PromptManager] Prompt not found: " + id);
+            LOG.debug("[AbstractPromptManager] Prompt not found: " + id);
             return false;
         }
 
@@ -200,7 +211,7 @@ public class PromptManager {
         prompts.remove(id);
 
         writePromptConfig(config);
-        LOG.debug("[PromptManager] Deleted prompt: " + id);
+        LOG.debug("[AbstractPromptManager] Deleted prompt: " + id);
         return true;
     }
 
@@ -336,12 +347,12 @@ public class PromptManager {
                 if (hasConflict) {
                     switch (strategy) {
                         case SKIP:
-                            LOG.debug("[PromptManager] Skipping conflicting prompt: " + id);
+                            LOG.debug("[AbstractPromptManager] Skipping conflicting prompt: " + id);
                             skipped++;
                             continue;
 
                         case OVERWRITE:
-                            LOG.debug("[PromptManager] Overwriting existing prompt: " + id);
+                            LOG.debug("[AbstractPromptManager] Overwriting existing prompt: " + id);
                             prompt.addProperty("updatedAt", System.currentTimeMillis());
                             prompts.add(id, prompt);
                             updated++;
@@ -349,7 +360,7 @@ public class PromptManager {
 
                         case DUPLICATE:
                             String newId = generateUniqueId(id, prompts);
-                            LOG.debug("[PromptManager] Creating duplicate with new ID: " + newId);
+                            LOG.debug("[AbstractPromptManager] Creating duplicate with new ID: " + newId);
                             JsonObject duplicatedPrompt = prompt.deepCopy();
                             duplicatedPrompt.addProperty("id", newId);
                             if (!duplicatedPrompt.has("createdAt")) {
@@ -372,14 +383,14 @@ public class PromptManager {
                 }
             } catch (Exception e) {
                 String errorMsg = "Failed to import prompt: " + e.getMessage();
-                LOG.warn("[PromptManager] " + errorMsg);
+                LOG.warn("[AbstractPromptManager] " + errorMsg);
                 errors.add(errorMsg);
                 skipped++;
             }
         }
 
         writePromptConfig(config);
-        LOG.debug(String.format("[PromptManager] Batch import completed: %d imported, %d updated, %d skipped",
+        LOG.debug(String.format("[AbstractPromptManager] Batch import completed: %d imported, %d updated, %d skipped",
                 imported, updated, skipped));
 
         result.put("imported", imported);

@@ -2,7 +2,7 @@ package com.github.claudecodegui.handler;
 
 import com.github.claudecodegui.CodemossSettingsService;
 import com.github.claudecodegui.model.ConflictStrategy;
-import com.github.claudecodegui.settings.PromptManager;
+import com.github.claudecodegui.settings.AbstractPromptManager;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -418,7 +418,7 @@ public class PromptHandler extends BaseMessageHandler {
                 }
 
                 // Validate and detect conflicts
-                PromptManager promptManager = settingsService.getPromptManager();
+                AbstractPromptManager promptManager = settingsService.getPromptManager();
                 Set<String> conflicts = promptManager.detectConflicts(promptsToImport);
 
                 // Prepare preview data
@@ -491,7 +491,7 @@ public class PromptHandler extends BaseMessageHandler {
                 promptsToImport.add(selectedPromptsArray.get(i).getAsJsonObject());
             }
 
-            PromptManager promptManager = settingsService.getPromptManager();
+            AbstractPromptManager promptManager = settingsService.getPromptManager();
             Map<String, Object> result = promptManager.batchImportPrompts(promptsToImport, strategy);
 
             // Send result to frontend
