@@ -1,6 +1,6 @@
 import type { ToolInput } from '../types';
 import { getFileName, truncate } from './helpers';
-import { extractFilePathFromCommand, unwrapShellCommand } from './toolCommandPath';
+import { extractFilePathFromCommand, isCommandToolName, unwrapShellCommand } from './toolCommandPath';
 
 const SPECIAL_FILES = new Set([
   'makefile', 'dockerfile', 'jenkinsfile', 'vagrantfile',
@@ -40,7 +40,7 @@ const parseNumber = (value: unknown): number | undefined => {
 const relativizeDisplayPath = (filePath: string, workdir?: string): string => {
   const cleanPath = stripLineSuffix(filePath);
 
-  // 如果是绝对路径且有 workdir，尝试相对化
+  // If absolute path with workdir, try to relativize
   if (workdir && cleanPath.startsWith('/') && workdir.startsWith('/')) {
     if (cleanPath === workdir) {
       return filePath.startsWith(cleanPath) ? './' : '.';
@@ -54,7 +54,7 @@ const relativizeDisplayPath = (filePath: string, workdir?: string): string => {
     }
   }
 
-  // 对于相对路径或无法相对化的路径，只返回文件名
+  // For relative paths or paths that cannot be relativized, just return the file name
   return getFileName(filePath);
 };
 
@@ -142,12 +142,7 @@ export const resolveToolTarget = (input: ToolInput, name?: string): ToolTargetIn
   // Command-executing tools that may contain file paths
   const isCommandTool = lowerName === 'read' ||
     lowerName === 'write' ||
-    lowerName === 'shell_command' ||
-    lowerName === 'exec_command' ||
-    lowerName === 'execute_command' ||
-    lowerName === 'executecommand' ||
-    lowerName === 'bash' ||
-    lowerName === 'run_terminal_cmd';
+    isCommandToolName(lowerName);
 
   // Codex uses 'cmd', others use 'command'
   const commandStr = (typeof input.command === 'string' ? input.command : undefined) ??

@@ -5,31 +5,53 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Codex message format conversion utilities.
  * <p>
- * Contains all pure static methods for converting Codex message formats to Claude-compatible
+ * Contains static methods for converting Codex message formats to Claude-compatible
  * frontend formats. Extracted from HistoryHandler to improve separation of concerns.
  * <p>
- * These methods have no state and do not depend on any handler context.
+ * Note: {@link #SESSION_FILE_MAP} maintains minimal state to track file-writing sessions
+ * across related exec_command / write_stdin pairs. Call {@link #clearSessionState()} when
+ * a new conversation starts to avoid stale entries.
  */
 public class CodexMessageConverter {
 
+    /** Maximum number of tracked file-writing sessions to prevent unbounded growth. */
+    private static final int MAX_SESSION_ENTRIES = 256;
+
     // Tracks file-writing sessions so later write_stdin events can display the target file.
-    private static final Map<Integer, String> SESSION_FILE_MAP = new ConcurrentHashMap<>();
+    // Uses a bounded LRU map to prevent memory leaks over long IDE sessions.
+    private static final Map<Integer, String> SESSION_FILE_MAP =
+        Collections.synchronizedMap(new LinkedHashMap<Integer, String>(64, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Integer, String> eldest) {
+                return size() > MAX_SESSION_ENTRIES;
+            }
+        });
 
     // Extracts a destination path from common shell write patterns.
+    // Note: The echo/printf alternative uses [^>]* instead of .* to prevent greedy matching across redirections.
     private static final Pattern WRITE_CMD_PATTERN = Pattern.compile(
-        "cat\\s*>\\s*([^\\s;|&]+)|tee\\s+(?:-[a-zA-Z]+\\s+)*([^\\s;|&]+)|(?:echo|printf)\\s+.*>\\s*([^\\s;|&]+)"
+        "cat\\s*>\\s*([^\\s;|&]+)|tee\\s+(?:-[a-zA-Z]+\\s+)*([^\\s;|&]+)|(?:echo|printf)\\s+[^>]*>\\s*([^\\s;|&]+)"
     );
 
     private CodexMessageConverter() {
         // Utility class, no instantiation.
+    }
+
+    /**
+     * Clear session tracking state. Should be called when a new conversation starts
+     * to avoid stale session-to-file mappings.
+     */
+    public static void clearSessionState() {
+        SESSION_FILE_MAP.clear();
     }
 
     /**

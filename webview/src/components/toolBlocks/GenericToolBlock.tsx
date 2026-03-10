@@ -5,7 +5,7 @@ import { useIsToolDenied } from '../../hooks/useIsToolDenied';
 import { openFile } from '../../utils/bridge';
 import { formatParamValue, truncate } from '../../utils/helpers';
 import { getFileIcon, getFolderIcon } from '../../utils/fileIcons';
-import { parseCommandType } from '../../utils/toolCommandPath';
+import { isCommandToolName, parseCommandType } from '../../utils/toolCommandPath';
 import { getToolLineInfo, resolveToolTarget, summarizeToolCommand, extractPathsFromPatch } from '../../utils/toolPresentation';
 
 const CODICON_MAP: Record<string, string> = {
@@ -34,19 +34,11 @@ const getToolDisplayName = (t: any, name?: string, input?: ToolInput) => {
 
   const lowerName = name.toLowerCase();
 
-  // Command-executing tools that may contain file-reading commands
-  const isCommandTool = lowerName === 'shell_command' ||
-    lowerName === 'exec_command' ||
-    lowerName === 'execute_command' ||
-    lowerName === 'executecommand' ||
-    lowerName === 'bash' ||
-    lowerName === 'run_terminal_cmd';
-
   // Codex uses 'cmd', others use 'command'
   const commandStr = (input?.command as string | undefined) ?? (input?.cmd as string | undefined);
 
   // For command-executing tools, check the actual command to determine display name
-  if (isCommandTool && commandStr) {
+  if (isCommandToolName(lowerName) && commandStr) {
     const parsed = parseCommandType(commandStr);
     switch (parsed.type) {
       case 'read':
@@ -116,17 +108,9 @@ const getToolDisplayName = (t: any, name?: string, input?: ToolInput) => {
 
 const getToolCodicon = (name?: string, input?: ToolInput): string => {
   const lowerName = (name ?? '').toLowerCase();
-
-  const isCommandTool = lowerName === 'shell_command' ||
-    lowerName === 'exec_command' ||
-    lowerName === 'execute_command' ||
-    lowerName === 'executecommand' ||
-    lowerName === 'bash' ||
-    lowerName === 'run_terminal_cmd';
-
   const commandStr = (input?.command as string | undefined) ?? (input?.cmd as string | undefined);
 
-  if (isCommandTool && commandStr) {
+  if (isCommandToolName(lowerName) && commandStr) {
     const parsed = parseCommandType(commandStr);
     switch (parsed.type) {
       case 'read':
@@ -227,13 +211,7 @@ const GenericToolBlock = ({ name, input, result, toolId }: GenericToolBlockProps
   const lineInfo = input && target ? getToolLineInfo(input, target) : {};
 
   // For command-executing tools with read type, treat as file if we have a path
-  const isCommandTool = lowerName === 'shell_command' ||
-    lowerName === 'exec_command' ||
-    lowerName === 'execute_command' ||
-    lowerName === 'executecommand' ||
-    lowerName === 'bash' ||
-    lowerName === 'run_terminal_cmd';
-  const isCommandRead = isCommandTool && commandStr && parseCommandType(commandStr).type === 'read';
+  const isCommandRead = isCommandToolName(lowerName) && commandStr && parseCommandType(commandStr).type === 'read';
   const effectiveIsFile = isFilePath || isCommandRead;
 
   const handleFileClick = (e: React.MouseEvent) => {

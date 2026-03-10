@@ -36,13 +36,15 @@ export const openFile = (filePath?: string, lineStart?: number, lineEnd?: number
   if (!filePath) {
     return;
   }
-  // Security: Validate file path
+  // Security: Validate base file path
   if (!isValidPath(filePath)) {
     return;
   }
   let path = filePath;
-  if (lineStart !== undefined) {
-    path = lineEnd !== undefined ? `${filePath}:${lineStart}-${lineEnd}` : `${filePath}:${lineStart}`;
+  if (lineStart !== undefined && Number.isFinite(lineStart) && lineStart > 0) {
+    path = (lineEnd !== undefined && Number.isFinite(lineEnd) && lineEnd > 0)
+      ? `${filePath}:${lineStart}-${lineEnd}`
+      : `${filePath}:${lineStart}`;
   }
   sendBridgeEvent('open_file', path);
 };

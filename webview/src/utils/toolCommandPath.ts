@@ -170,14 +170,24 @@ const parseSegmentPath = (segment: string, workdir?: string): string | undefined
     return endLine ? `${path}:${startLine}-${endLine}` : `${path}:${startLine}`;
   }
 
-  const catMatch = segment.match(/^cat\s+(.+)$/);
+  // cat with optional flags (e.g., cat -n file.txt)
+  const catMatch = segment.match(/^cat\s+(?:-[a-zA-Z]+\s+)*(\S+)$/);
   if (catMatch) {
-    return normalizePathToken(catMatch[1]);
+    const token = normalizePathToken(catMatch[1]);
+    // Ensure it's not a flag
+    if (!token.startsWith('-')) {
+      return token;
+    }
   }
 
-  const headTailMatch = segment.match(/^(head|tail)\s+(?:-[a-zA-Z]+\s+\S+\s+)*(.+)$/);
+  // head/tail: extract the last non-flag token as the file path
+  const headTailMatch = segment.match(/^(head|tail)\s+.*\s+(\S+)$/);
   if (headTailMatch) {
-    return normalizePathToken(headTailMatch[2]);
+    const lastToken = normalizePathToken(headTailMatch[2]);
+    // Only treat as path if it doesn't start with '-'
+    if (!lastToken.startsWith('-')) {
+      return lastToken;
+    }
   }
 
   // nl -ba file | sed -n '1,100p' - extract file from nl command
@@ -269,7 +279,18 @@ export interface ParsedCommandInfo {
   path?: string;
 }
 
-const READ_COMMANDS = ['cat', 'head', 'tail', 'less', 'more', 'nl', 'bat', 'sed'];
+/** Tool names that execute shell commands (shared across components). */
+export const COMMAND_TOOL_NAMES = new Set([
+  'shell_command', 'exec_command', 'execute_command',
+  'executecommand', 'bash', 'run_terminal_cmd',
+]);
+
+/** Check if a tool name represents a command-executing tool. */
+export const isCommandToolName = (name: string): boolean =>
+  COMMAND_TOOL_NAMES.has(name.toLowerCase());
+
+// sed is handled separately - only 'sed -n' (print mode) counts as read
+const READ_COMMANDS = ['cat', 'head', 'tail', 'less', 'more', 'nl', 'bat'];
 const LIST_COMMANDS = ['ls', 'tree', 'find', 'git ls-files', 'git ls-tree'];
 const SEARCH_COMMANDS = ['grep', 'rg', 'git grep', 'ag', 'ack'];
 
@@ -282,6 +303,16 @@ export const parseCommandType = (command: string | undefined): ParsedCommandInfo
   const firstSegment = normalizedCommand.split('\n')[0]?.trim() ?? '';
 
   const lowerCommand = firstSegment.toLowerCase();
+
+  // Handle sed specially: only 'sed -n' (print mode) is a read command
+  if (/^sed\s+-n\s+/.test(lowerCommand)) {
+    const path = extractFilePathFromCommand(command);
+    return {
+      type: 'read',
+      displayText: path ?? firstSegment,
+      path,
+    };
+  }
 
   for (const cmd of READ_COMMANDS) {
     if (lowerCommand.startsWith(cmd + ' ') || lowerCommand === cmd) {
