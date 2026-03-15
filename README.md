@@ -21,6 +21,12 @@ A powerful IntelliJ IDEA plugin that provides a visual interface for **Claude Co
 
 ---
 
+## Installation
+
+[IDEA Claude Code GUI Installation](https://plugins.jetbrains.com/plugin/30666-cc-gui)
+
+---
+
 ## Key Features
 
 ### Dual AI Engine Support
@@ -59,12 +65,6 @@ A powerful IntelliJ IDEA plugin that provides a visual interface for **Claude Co
 ## Project Status
 
 The project is under active development with continuous updates. For version history and iteration progress, please read [CHANGELOG.md](CHANGELOG.md)
-
----
-
-## Installation
-
-[IDEA Claude Code GUI Installation](https://plugins.jetbrains.com/plugin/29342-claude-code-gui)
 
 ---
 

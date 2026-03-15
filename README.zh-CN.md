@@ -20,6 +20,12 @@
 
 ---
 
+## 插件下载
+
+[IDEA Claude Code GUI 下载](https://plugins.jetbrains.com/plugin/30666-cc-gui)
+
+---
+
 ## 核心特性
 
 ### 双 AI 引擎支持
@@ -58,12 +64,6 @@
 ## 项目状态
 
 项目处于活跃开发阶段，代码持续更新中。版本历史和迭代进度请阅读 [CHANGELOG.md](CHANGELOG.md)
-
----
-
-## 插件下载
-
-[IDEA Claude Code GUI 下载](https://plugins.jetbrains.com/plugin/29342-claude-code-gui)
 
 ---
 
