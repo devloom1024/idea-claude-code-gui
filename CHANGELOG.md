@@ -1,3 +1,41 @@
+##### **2026年3月16日（v0.3）**
+
+English:
+
+✨ Features
+- Add file context placeholder with enable confirmation popover in ContextBar: when autoOpenFile is disabled, show a dashed placeholder button; clicking it displays a confirmation popover to re-enable file context tracking, with i18n support for 8 locales
+- Replace raw error with friendly provider-not-configured card: show an amber-toned warning card with settings icon and "Go to Provider Settings" button when no API key is set, improving first-run experience
+
+🐛 Fixes
+- Fix active sessions being interrupted when a single request exceeds 30 minutes: add activeTurnCount tracking, runtime absolute lifetime cap (6 hours), and improved turn lifecycle safety (#672) #JackCmd233
+- Fix token usage tracking in streaming multi-turn conversations: properly accumulate usage across turns instead of resetting, remove conflicting emission logic (#686)
+- Fix CRLF/LF line ending mismatch in diff review on Windows: try LF↔CRLF conversion when exact match fails, extend dialogShower registration wait timeout (#687) #gadfly3173
+- Fix session title data loss from race conditions: use atomic write (tmp + rename) for session titles, add ReentrantLock to serialize concurrent operations, preserve existing titles during full scan
+- Fix Codex session transition guard on history restore: clear transition state when restoring session to unblock subsequent history message calls
+
+🔧 Improvements
+- Extract shared ProviderModelIcon component and modelIconMapping utility: support 19 model vendors (Qwen, DeepSeek, Kimi, Mistral, Meta, etc.) with pattern-based model ID to vendor icon resolution, replace duplicated ProviderIcon switch statements across 5 files
+- Extract line-ending normalization helper findLineEndingVariant() to eliminate duplicated CRLF/LF conversion logic, add no-op fast path, extract magic numbers to named constants
+
+中文：
+
+✨ Features
+- 上下文栏新增文件上下文占位符及启用确认弹窗：autoOpenFile 关闭时显示虚线占位按钮，点击后弹出确认窗口重新启用文件上下文跟踪，支持 8 种语言国际化
+- 未配置 Provider 时显示友好提示卡片：用琥珀色警告卡片替代默认红色错误信息，包含设置图标和「前往 Provider 设置」按钮，优化首次使用体验
+
+🐛 Fixes
+- 修复单次请求超过 30 分钟时程序打断正在运行的会话：添加 activeTurnCount 跟踪、运行时绝对生命周期上限（6 小时）及改进的 turn 生命周期安全管理 (#672) #JackCmd233
+- 修复流式多轮对话中 Token 用量统计错误：正确累积各 turn 用量而非重置，移除冲突的发射逻辑 (#686)
+- 修复 Windows 上 Diff Review 因 CRLF/LF 换行符不匹配无法打开：精确匹配失败时尝试 LF↔CRLF 转换，延长 dialogShower 注册等待超时 (#687) #gadfly3173
+- 修复会话标题因竞态条件丢失：使用原子写入（tmp + rename）保存会话标题，添加 ReentrantLock 序列化并发操作，全量扫描时保留已有标题
+- 修复 Codex 会话恢复时 transition guard 阻塞：恢复会话状态时清除 transition 状态以解除后续 history message 调用阻塞
+
+🔧 Improvements
+- 提取共享 ProviderModelIcon 组件及 modelIconMapping 工具：支持 19 家模型厂商（Qwen、DeepSeek、Kimi、Mistral、Meta 等）基于 pattern 的模型 ID 到厂商图标解析，替换 5 个文件中重复的 ProviderIcon switch 语句
+- 提取换行符规范化辅助函数 findLineEndingVariant()，消除重复的 CRLF/LF 转换逻辑，添加无操作快速路径，将魔数提取为命名常量
+
+---
+
 ##### **2026年3月15日（v0.2.9）**
 
 English:

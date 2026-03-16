@@ -13,6 +13,40 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '0.3',
+    date: '2026-03-16',
+    content: {
+      en: `✨ Features
+- Add file context placeholder with enable confirmation popover in ContextBar: show a dashed placeholder when autoOpenFile is disabled, with i18n support for 8 locales
+- Replace raw error with friendly provider-not-configured card: amber-toned warning with "Go to Provider Settings" button for first-run experience
+
+🐛 Fixes
+- Fix active sessions interrupted when request exceeds 30 minutes: add turn tracking and 6-hour runtime lifetime cap (#672) #JackCmd233
+- Fix token usage tracking in streaming multi-turn conversations: properly accumulate usage across turns (#686)
+- Fix CRLF/LF line ending mismatch in diff review on Windows (#687) #gadfly3173
+- Fix session title data loss from race conditions: atomic write and ReentrantLock for concurrent operations
+- Fix Codex session transition guard blocking history restore
+
+🔧 Improvements
+- Extract shared ProviderModelIcon component supporting 19 model vendors with pattern-based icon resolution
+- Extract line-ending normalization helper to eliminate duplicated CRLF/LF conversion logic`,
+      zh: `✨ Features
+- 上下文栏新增文件上下文占位符及启用确认弹窗：autoOpenFile 关闭时显示虚线占位按钮，支持 8 种语言国际化
+- 未配置 Provider 时显示友好提示卡片：琥珀色警告卡片替代红色错误，优化首次使用体验
+
+🐛 Fixes
+- 修复单次请求超过 30 分钟时打断正在运行的会话：添加 turn 跟踪及 6 小时运行时生命周期上限 (#672) #JackCmd233
+- 修复流式多轮对话中 Token 用量统计错误：正确累积各 turn 用量 (#686)
+- 修复 Windows 上 Diff Review 因换行符不匹配无法打开 (#687) #gadfly3173
+- 修复会话标题因竞态条件丢失：原子写入 + ReentrantLock 序列化并发操作
+- 修复 Codex 会话恢复时 transition guard 阻塞历史消息
+
+🔧 Improvements
+- 提取共享 ProviderModelIcon 组件，支持 19 家模型厂商 pattern 图标解析
+- 提取换行符规范化辅助函数，消除重复 CRLF/LF 转换逻辑`,
+    },
+  },
+  {
     version: '0.2.9',
     date: '2026-03-15',
     content: {
